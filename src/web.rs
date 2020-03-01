@@ -1,9 +1,8 @@
 use std::collections::HashMap;
-use std::io::Error;
+use std::io::{Error, Read};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::borrow::BorrowMut;
-use std::ops::Deref;
 
 #[derive(Debug,Clone)]
 pub struct HttpRequest {
@@ -104,7 +103,7 @@ pub trait HttpController: Sync + Send {
 /// Middleware nimmt Requests noch vor der Bearbeitung des entsprechenden WebControllers entgegen.
 /// Die Middleware kann die Request bearbeiten, weiterleiten oder ablehnen.
 /// Über Middlewares lässt sich z.B. Logging oder Authorisierung realisieren.
-pub trait Middleware: Send + Sync{
+pub trait Middleware: Send + Sync {
     /// Verarbeitet die einzelne Request und kann über den Rückgabetyp entscheiden
     /// ob die Request an die nächste Middleware oder WebController weitergereicht,abgelehnt oder
     /// vorher noch bearbeitet wird.
@@ -125,27 +124,34 @@ pub trait WebServer<I: Into<HttpRequest>, O: Into<HttpResponse>> {
 }
 
 pub trait RequestProcessor<I: Into<HttpRequest>, O: From<HttpResponse>>: Sync {
-    fn dispatch(&mut self, controller: Vec<Arc<dyn HttpController>>, middlewares: Vec<Arc<dyn Middleware>>);
+    fn dispatch(&mut self, controller: Vec<Box<dyn HttpController>>, middlewares: Vec<Box<dyn Middleware>>);
     fn process(&mut self, req: I) -> O;
 }
 
 pub struct StandardRequestProcessor {
-    middlewares: Vec<Arc<dyn Middleware>>,
-    controller: Vec<Arc<dyn HttpController>>,
+    middlewares: Vec<Box<dyn Middleware>>,
+    controller: Vec<Box<dyn HttpController>>,
 }
 
 impl <I,O>RequestProcessor<I,O> for StandardRequestProcessor where I: Into<HttpRequest>,O: From<HttpResponse> {
-    fn dispatch(&mut self, controller: Vec<Arc<dyn HttpController>>, middlewares: Vec<Arc<dyn Middleware>>) {
-        self.middlewares = middlewares;
-        self.controller = controller;
+    fn dispatch(&mut self, controller: Vec<Box<dyn HttpController>>, middlewares: Vec<Box<dyn Middleware>>) {
+        //self.middlewares = middlewares;
+        //self.controller = controller;
     }
 
     fn process(&mut self, req: I) -> O {
+        //TODO
         let mut req = req.into();
-        for middleware in &mut self.middlewares {
-            match middleware.process(&mut req) {
-                ProcessResult::Done => {continue},
-                ProcessResult::Response(resp) => {return resp.clone().into()}
+        for i in 0..self.middlewares.len() - 1  {
+            let middleware = self.middlewares.get_mut(i);
+            match middleware {
+                None => {},
+                Some(m) => {
+                        match m.process(&mut req) {
+                            ProcessResult::Done => {},
+                            ProcessResult::Response(_) => {},
+                        }
+                },
             }
         }
         HttpResponse::not_found().into()

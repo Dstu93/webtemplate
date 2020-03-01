@@ -17,8 +17,8 @@ impl CountController {
 
 impl HttpController for CountController {
 
-    fn url(&self) -> String {
-        String::from("/count")
+    fn url(&self) -> &'static str {
+        "/api/counter"
     }
 
     fn on_get(&mut self, _req: &HttpRequest) -> HttpResponse {

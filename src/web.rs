@@ -7,7 +7,7 @@ use std::borrow::BorrowMut;
 #[derive(Debug,Clone)]
 pub struct HttpRequest {
     pub method: HttpMethod,
-    pub url: String,
+    pub path: String,
     pub params: HashMap<String,String>,
     pub headers: HashMap<String,String>,
     pub cookies: HashMap<String,String>,
@@ -80,7 +80,7 @@ impl HttpResponse {
 pub trait HttpController: Sync + Send {
 
     /// URL für die der WebController die Requests bearbeitet.
-    fn url(&self) -> String;
+    fn url(&self) -> &'static str;
 
     fn on_post(&mut self,_req: &HttpRequest) -> HttpResponse {
         HttpResponse::not_found()
@@ -124,7 +124,6 @@ pub trait WebServer<I: Into<HttpRequest>, O: Into<HttpResponse>> {
 }
 
 pub trait RequestProcessor<I: Into<HttpRequest>, O: From<HttpResponse>>: Sync {
-    fn dispatch(&mut self, controller: Vec<Box<dyn HttpController>>, middlewares: Vec<Box<dyn Middleware>>);
     fn process(&mut self, req: I) -> O;
 }
 
@@ -134,27 +133,30 @@ pub struct StandardRequestProcessor {
 }
 
 impl <I,O>RequestProcessor<I,O> for StandardRequestProcessor where I: Into<HttpRequest>,O: From<HttpResponse> {
-    fn dispatch(&mut self, controller: Vec<Box<dyn HttpController>>, middlewares: Vec<Box<dyn Middleware>>) {
-        //self.middlewares = middlewares;
-        //self.controller = controller;
-    }
 
     fn process(&mut self, req: I) -> O {
-        //TODO
         let mut req = req.into();
-        for i in 0..self.middlewares.len() - 1  {
-            let middleware = self.middlewares.get_mut(i);
-            match middleware {
-                None => {},
-                Some(m) => {
-                        match m.process(&mut req) {
-                            ProcessResult::Done => {},
-                            ProcessResult::Response(_) => {},
-                        }
-                },
+        for m in self.middlewares.iter_mut() {
+            match m.process(&mut req) {
+                ProcessResult::Done => continue,
+                ProcessResult::Response(resp) => return resp.into(),
             }
         }
-        HttpResponse::not_found().into()
+        //Middlewares sind durchlaufen, nun koennen wir den entsprechenden HttpController arbeiten lassen.
+        let controller_option = self.controller
+            .iter_mut()
+            .find(|http_controller| http_controller.url().eq(&req.path));
+        match controller_option {
+            None => {HttpResponse::not_found().into()},
+            Some(c) => {
+                match req.method {
+                    HttpMethod::Get => c.on_get(&mut req).into(),
+                    HttpMethod::Post => c.on_post(&mut req).into(),
+                    HttpMethod::Delete => c.on_delete(&mut req).into(),
+                    HttpMethod::Put => c.on_put(&mut req).into(),
+                }
+            },
+        }
     }
 }
 

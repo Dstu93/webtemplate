@@ -1,19 +1,24 @@
-use crate::web::{WebServer, ApplicationError, HttpController, Middleware, RequestProcessor};
-use canteen::Canteen;
+use crate::web::{WebServer, ApplicationError, HttpController, Middleware, RequestProcessor, HttpRequest, HttpResponse, HttpMethod};
+use std::sync::mpsc::{Receiver, Sender};
+use hyper::{Request, Response};
 
-pub struct CanteenWebserver;
+pub struct WebServerImpl;
 
-// impl WebServer for CanteenWebserver {
-//     fn start(self, ip: String, port: u16, processor: RequestProcessor<_, _>) -> Result<(), ApplicationError> {
-//         unimplemented!()
-//     }
-//     fn start(self, ip: String, port: u16, controller: Vec<Box<dyn WebController>>, middlewares: Vec<Box<dyn Middleware>>) -> Result<(), ApplicationError> {
-//         let mut canteen = Canteen::new();
-//         canteen.bind(format!("{}:{}",ip,port));
-//         //canteen.set_default() //TODO
-//         Ok(())
-//     }
-// }
+impl WebServer<Request<Vec<u8>>, Response<Vec<u8>>> for WebServerImpl {
+    fn start(self, ip: String, port: u16, processor: Box<dyn RequestProcessor<Request<Vec<u8>>, Response<Vec<u8>>>>) -> Result<(), ApplicationError> {
+        //TODO
+        unimplemented!()
+    }
+}
 
-//TODO From für die Requests und Responses
-// RequestProcessor implementieren... RequestProcessor muss kein Trait sein sondern kann eine Struct sein...
+impl Into<HttpRequest> for Request<Vec<u8>> {
+    fn into(self) -> HttpRequest {
+        unimplemented!()
+    }
+}
+
+impl From<HttpResponse> for Response<Vec<u8>> {
+    fn from(_: HttpResponse) -> Self {
+        unimplemented!()
+    }
+}

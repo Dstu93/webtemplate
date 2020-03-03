@@ -9,4 +9,4 @@ edition = "2018"
 [dependencies]
 serde = "1.0.104"
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
-canteen = "0.5.5"
+hyper = "0.13.*"

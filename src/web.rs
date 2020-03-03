@@ -119,8 +119,8 @@ pub enum ProcessResult {
     Response(HttpResponse),
 }
 
-pub trait WebServer<I: Into<HttpRequest>, O: Into<HttpResponse>> {
-    fn start(self,ip: String, port: u16, processor: dyn RequestProcessor<I,O>) -> Result<(),ApplicationError>;
+pub trait WebServer<I: Into<HttpRequest>, O: From<HttpResponse>> {
+    fn start(self,ip: String, port: u16, processor: Box<dyn RequestProcessor<I,O>>) -> Result<(),ApplicationError>;
 }
 
 pub trait RequestProcessor<I: Into<HttpRequest>, O: From<HttpResponse>>: Sync {
@@ -128,8 +128,8 @@ pub trait RequestProcessor<I: Into<HttpRequest>, O: From<HttpResponse>>: Sync {
 }
 
 pub struct StandardRequestProcessor {
-    middlewares: Vec<Box<dyn Middleware>>,
-    controller: Vec<Box<dyn HttpController>>,
+    pub middlewares: Vec<Box<dyn Middleware>>,
+    pub controller: Vec<Box<dyn HttpController>>,
 }
 
 impl <I,O>RequestProcessor<I,O> for StandardRequestProcessor where I: Into<HttpRequest>,O: From<HttpResponse> {

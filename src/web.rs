@@ -123,7 +123,7 @@ pub trait WebServer<I: Into<HttpRequest>, O: From<HttpResponse>> {
     fn start(self,ip: String, port: u16, processor: Box<dyn RequestProcessor<I,O>>) -> Result<(),ApplicationError>;
 }
 
-pub trait RequestProcessor<I: Into<HttpRequest>, O: From<HttpResponse>>: Sync {
+pub trait RequestProcessor<I: Into<HttpRequest>, O: From<HttpResponse>>: Sync + Send{
     fn process(&mut self, req: I) -> O;
 }
 

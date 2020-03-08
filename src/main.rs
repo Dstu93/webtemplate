@@ -10,7 +10,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Error, Response, Server};
+use hyper::{Body, Error, Response, Server, Request};
 use std::sync::mpsc::channel;
 
 fn main() {
@@ -33,18 +33,24 @@ async fn run() {
     let (sender,recv) = channel::<String>();
     // Using a !Send request counter is fine on 1 thread...
     let counter = Rc::new(Cell::new(0));
+    let (sender,recv) = crossbeam_channel::unbounded();
+    let (rsp_sender,rsp_recv) = crossbeam_channel::unbounded::<Response<Body>>();
 
     let make_service = make_service_fn(move |_| {
         // For each connection, clone the counter to use in our service...
         let cnt = counter.clone();
         let sender = sender.clone();
+        let response_recv = rsp_recv.clone();
         async move {
-            Ok::<_, Error>(service_fn(move |_| {
+            Ok::<_, Error>(service_fn(move |req: Request<Body>| {
                 let prev = cnt.get();
                 cnt.set(prev + 1);
                 let value = cnt.get();
-                let req = sender.send(String::from(""));
-                async move { Ok::<_, Error>(Response::new(Body::from(format!("Request #{}", value)))) }
+                let req = sender.send(req);
+                let response_recv = response_recv.clone();
+                async move {
+                    Ok::<_, Error>(response_recv.recv().expect("http response recv crashed"))
+                }
             }))
         }
     });

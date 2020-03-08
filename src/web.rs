@@ -194,5 +194,10 @@ impl<I, O> DualChannel<I, O> where I: Send, O: Send {
 
         (first_channel,second_channel)
     }
+
+    pub async fn send_n_receive(&self, i: I) -> O {
+        self.sender.send(i).expect("could not send");
+        self.recv.recv().expect("channel error")
+    }
 }
 

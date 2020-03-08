@@ -1,8 +1,6 @@
 use std::collections::HashMap;
-use std::io::{Error, Read};
+use std::io::Error;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
-use std::borrow::BorrowMut;
 
 #[derive(Debug,Clone)]
 pub struct HttpRequest {
@@ -48,7 +46,7 @@ impl HttpResponse {
         headers.insert("Content-Type".into(),content_type.into());
         HttpResponse{
             status,
-            headers: headers,
+            headers,
             body,
         }
     }
@@ -70,7 +68,7 @@ impl HttpResponse {
         headers.insert("Content-Type".into(),"application/json".into());
         HttpResponse{
             status: 200,
-            headers: headers,
+            headers,
             body: body.into_bytes(),
         }
     }
@@ -148,13 +146,11 @@ impl <I,O>RequestProcessor<I,O> for StandardRequestProcessor where I: Into<HttpR
             .find(|http_controller| http_controller.url().eq(&req.path));
         match controller_option {
             None => {HttpResponse::not_found().into()},
-            Some(c) => {
-                match req.method {
-                    HttpMethod::Get => c.on_get(&mut req).into(),
-                    HttpMethod::Post => c.on_post(&mut req).into(),
-                    HttpMethod::Delete => c.on_delete(&mut req).into(),
-                    HttpMethod::Put => c.on_put(&mut req).into(),
-                }
+            Some(c) => match req.method {
+                HttpMethod::Get => c.on_get(&req).into(),
+                HttpMethod::Post => c.on_post(&req).into(),
+                HttpMethod::Delete => c.on_delete(&req).into(),
+                HttpMethod::Put => c.on_put(&req).into(),
             },
         }
     }

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::Error;
 use serde::{Deserialize, Serialize};
+use crossbeam_channel::{Sender, Receiver};
 
 #[derive(Debug,Clone)]
 pub struct HttpRequest {
@@ -170,3 +171,28 @@ impl Into<HttpResponse> for JsonError {
         HttpResponse::new(Vec::new(),"application/json",400)
     }
 }
+
+#[derive(Clone)]
+/// Channel for Thread communication for sending Struct in 2 Directions
+pub struct DualChannel<I,O> where I: Send,O: Send {
+    sender: Sender<I>,
+    recv: Receiver<O>,
+}
+
+impl<I, O> DualChannel<I, O> where I: Send, O: Send {
+    pub fn new() ->  (DualChannel<I,O>,DualChannel<O,I>) {
+        let (sender1,recv1) = crossbeam_channel::unbounded();
+        let (sender2,recv2) = crossbeam_channel::unbounded();
+        let first_channel = DualChannel{
+            sender: sender1,
+            recv: recv2,
+        };
+        let second_channel = DualChannel {
+            sender: sender2,
+            recv: recv1,
+        };
+
+        (first_channel,second_channel)
+    }
+}
+

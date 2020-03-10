@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::io::Error;
 use serde::{Deserialize, Serialize};
 use crossbeam_channel::{Sender, Receiver};
+use std::thread::Builder;
+use std::thread::JoinHandle;
 
 #[derive(Debug,Clone)]
 pub struct HttpRequest {
@@ -63,14 +65,15 @@ impl HttpResponse {
     }
 
     pub fn with_json<T: Serialize>(payload: &T) -> Self {
-        let body = serde_json::to_string(payload).unwrap();
+        let body = serde_json::to_vec(payload)
+            .expect("could not deserialize payload");
         let mut headers = HashMap::new();
         headers.insert("Connection".into(),"close".into());
         headers.insert("Content-Type".into(),"application/json".into());
         HttpResponse{
             status: 200,
             headers,
-            body: body.into_bytes(),
+            body,
         }
     }
 }
@@ -118,22 +121,22 @@ pub enum ProcessResult {
     Response(HttpResponse),
 }
 
-pub trait WebServer<I: Into<HttpRequest>, O: From<HttpResponse>> {
-    fn start(self,ip: String, port: u16, processor: Box<dyn RequestProcessor<I,O>>) -> Result<(),ApplicationError>;
+pub trait WebServer {
+    fn start(self, processor: Box<dyn RequestProcessor>) -> Result<(),ApplicationError>;
 }
 
-pub trait RequestProcessor<I: Into<HttpRequest>, O: From<HttpResponse>>: Sync + Send{
-    fn process(&mut self, req: I) -> O;
+pub trait RequestProcessor: Sync + Send{
+    fn process(&mut self, req: HttpRequest) -> HttpResponse;
 }
 
 pub struct StandardRequestProcessor {
-    pub middlewares: Vec<Box<dyn Middleware>>,
-    pub controller: Vec<Box<dyn HttpController>>,
+    middlewares: Vec<Box<dyn Middleware>>,
+    controller: Vec<Box<dyn HttpController>>,
 }
 
-impl <I,O>RequestProcessor<I,O> for StandardRequestProcessor where I: Into<HttpRequest>,O: From<HttpResponse> {
+impl RequestProcessor for StandardRequestProcessor {
 
-    fn process(&mut self, req: I) -> O {
+    fn process(&mut self, req: HttpRequest) -> HttpResponse {
         let mut req = req.into();
         for m in self.middlewares.iter_mut() {
             match m.process(&mut req) {
@@ -146,12 +149,12 @@ impl <I,O>RequestProcessor<I,O> for StandardRequestProcessor where I: Into<HttpR
             .iter_mut()
             .find(|http_controller| http_controller.url().eq(&req.path));
         match controller_option {
-            None => {HttpResponse::not_found().into()},
+            None => {HttpResponse::not_found()},
             Some(c) => match req.method {
-                HttpMethod::Get => c.on_get(&req).into(),
-                HttpMethod::Post => c.on_post(&req).into(),
-                HttpMethod::Delete => c.on_delete(&req).into(),
-                HttpMethod::Put => c.on_put(&req).into(),
+                HttpMethod::Get => c.on_get(&req),
+                HttpMethod::Post => c.on_post(&req),
+                HttpMethod::Delete => c.on_delete(&req),
+                HttpMethod::Put => c.on_put(&req),
             },
         }
     }
@@ -168,7 +171,10 @@ pub enum JsonError {
 
 impl Into<HttpResponse> for JsonError {
     fn into(self) -> HttpResponse {
-        HttpResponse::new(Vec::new(),"application/json",400)
+        let mut response = HttpResponse::new(Vec::new(),
+                                         "application/json",400);
+        response.headers.insert("Accept".into(),"application/json".into());
+        response
     }
 }
 
@@ -205,5 +211,45 @@ impl<I, O> BidirectionalChannel<I, O> where I: Send, O: Send {
         self.recv.recv().expect("could not receive from channel")
     }
 
+    pub fn send(&self, input: I) {
+        self.sender.send(input).expect("could not send");
+    }
+
+    pub fn recv(&self) -> O {
+        self.recv.recv().expect("could not listen on Channel")
+    }
+}
+
+
+pub struct RequestDispatcher {
+    workers: Vec<JoinHandle<()>>,
+}
+
+impl RequestDispatcher {
+
+    pub fn new() -> Self {
+        RequestDispatcher{ workers: Vec::new() }
+    }
+
+    pub fn register(&mut self) -> DualChannel<HttpRequest,HttpResponse> {
+        //TODO StandardRequestProcessor factory
+        let mut request_processor = StandardRequestProcessor {
+            middlewares: vec![],
+            controller: vec![]
+        };
+        let (channel1,channel2) = DualChannel::new();
+        let handle = Builder::new()
+            .name(format!("Http-Worker-{}",self.workers.len() + 1 ))
+            .spawn(move || {
+                loop {
+                    let req = channel1.recv();
+                    println!("Processing Request {:#?}",req); //TODO remove
+                    let response = request_processor.process(req);
+                    channel1.send(response);
+                }
+            }).expect("could not spawn worker thread");
+        self.workers.push(handle);
+        channel2
+    }
 }
 

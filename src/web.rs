@@ -173,21 +173,21 @@ impl Into<HttpResponse> for JsonError {
 }
 
 #[derive(Clone)]
-/// Channel for Thread communication for sending Struct in 2 Directions
-pub struct DualChannel<I,O> where I: Send,O: Send {
+/// Channel for bidirectional Communication with 2 different Structs
+pub struct BidirectionalChannel<I,O> where I: Send,O: Send {
     sender: Sender<I>,
     recv: Receiver<O>,
 }
 
-impl<I, O> DualChannel<I, O> where I: Send, O: Send {
-    pub fn new() ->  (DualChannel<I,O>,DualChannel<O,I>) {
+impl<I, O> BidirectionalChannel<I, O> where I: Send, O: Send {
+    pub fn new() ->  (BidirectionalChannel<I,O>,BidirectionalChannel<O,I>) {
         let (sender1,recv1) = crossbeam_channel::unbounded();
         let (sender2,recv2) = crossbeam_channel::unbounded();
-        let first_channel = DualChannel{
+        let first_channel = BidirectionalChannel{
             sender: sender1,
             recv: recv2,
         };
-        let second_channel = DualChannel {
+        let second_channel = BidirectionalChannel {
             sender: sender2,
             recv: recv1,
         };

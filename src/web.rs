@@ -231,13 +231,13 @@ impl RequestDispatcher {
         RequestDispatcher{ workers: Vec::new() }
     }
 
-    pub fn register(&mut self) -> DualChannel<HttpRequest,HttpResponse> {
+    pub fn register(&mut self) -> BidirectionalChannel<HttpRequest,HttpResponse> {
         //TODO StandardRequestProcessor factory
         let mut request_processor = StandardRequestProcessor {
             middlewares: vec![],
             controller: vec![]
         };
-        let (channel1,channel2) = DualChannel::new();
+        let (channel1,channel2) = BidirectionalChannel::new();
         let handle = Builder::new()
             .name(format!("Http-Worker-{}",self.workers.len() + 1 ))
             .spawn(move || {

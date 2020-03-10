@@ -63,14 +63,15 @@ impl HttpResponse {
     }
 
     pub fn with_json<T: Serialize>(payload: &T) -> Self {
-        let body = serde_json::to_string(payload).unwrap();
+        let body = serde_json::to_vec(payload)
+            .expect("could not deserialize payload");
         let mut headers = HashMap::new();
         headers.insert("Connection".into(),"close".into());
         headers.insert("Content-Type".into(),"application/json".into());
         HttpResponse{
             status: 200,
             headers,
-            body: body.into_bytes(),
+            body,
         }
     }
 }

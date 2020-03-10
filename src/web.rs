@@ -118,22 +118,22 @@ pub enum ProcessResult {
     Response(HttpResponse),
 }
 
-pub trait WebServer<I: Into<HttpRequest>, O: From<HttpResponse>> {
-    fn start(self,ip: String, port: u16, processor: Box<dyn RequestProcessor<I,O>>) -> Result<(),ApplicationError>;
+pub trait WebServer {
+    fn start(self, processor: Box<dyn RequestProcessor>) -> Result<(),ApplicationError>;
 }
 
-pub trait RequestProcessor<I: Into<HttpRequest>, O: From<HttpResponse>>: Sync + Send{
-    fn process(&mut self, req: I) -> O;
+pub trait RequestProcessor: Sync + Send{
+    fn process(&mut self, req: HttpRequest) -> HttpResponse;
 }
 
 pub struct StandardRequestProcessor {
-    pub middlewares: Vec<Box<dyn Middleware>>,
-    pub controller: Vec<Box<dyn HttpController>>,
+    middlewares: Vec<Box<dyn Middleware>>,
+    controller: Vec<Box<dyn HttpController>>,
 }
 
-impl <I,O>RequestProcessor<I,O> for StandardRequestProcessor where I: Into<HttpRequest>,O: From<HttpResponse> {
+impl RequestProcessor for StandardRequestProcessor {
 
-    fn process(&mut self, req: I) -> O {
+    fn process(&mut self, req: HttpRequest) -> HttpResponse {
         let mut req = req.into();
         for m in self.middlewares.iter_mut() {
             match m.process(&mut req) {
@@ -146,12 +146,12 @@ impl <I,O>RequestProcessor<I,O> for StandardRequestProcessor where I: Into<HttpR
             .iter_mut()
             .find(|http_controller| http_controller.url().eq(&req.path));
         match controller_option {
-            None => {HttpResponse::not_found().into()},
+            None => {HttpResponse::not_found()},
             Some(c) => match req.method {
-                HttpMethod::Get => c.on_get(&req).into(),
-                HttpMethod::Post => c.on_post(&req).into(),
-                HttpMethod::Delete => c.on_delete(&req).into(),
-                HttpMethod::Put => c.on_put(&req).into(),
+                HttpMethod::Get => c.on_get(&req),
+                HttpMethod::Post => c.on_post(&req),
+                HttpMethod::Delete => c.on_delete(&req),
+                HttpMethod::Put => c.on_put(&req),
             },
         }
     }

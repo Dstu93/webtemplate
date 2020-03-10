@@ -169,7 +169,10 @@ pub enum JsonError {
 
 impl Into<HttpResponse> for JsonError {
     fn into(self) -> HttpResponse {
-        HttpResponse::new(Vec::new(),"application/json",400)
+        let mut response = HttpResponse::new(Vec::new(),
+                                         "application/json",400);
+        response.headers.insert("Accept".into(),"application/json".into());
+        response
     }
 }
 

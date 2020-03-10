@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::io::Error;
 use serde::{Deserialize, Serialize};
 use crossbeam_channel::{Sender, Receiver};
+use std::thread::Builder;
+use std::thread::JoinHandle;
 
 #[derive(Debug,Clone)]
 pub struct HttpRequest {
@@ -184,6 +186,7 @@ pub struct DualChannel<I,O> where I: Send,O: Send {
 }
 
 impl<I, O> DualChannel<I, O> where I: Send, O: Send {
+
     pub fn new() ->  (DualChannel<I,O>,DualChannel<O,I>) {
         let (sender1,recv1) = crossbeam_channel::unbounded();
         let (sender2,recv2) = crossbeam_channel::unbounded();
@@ -209,5 +212,45 @@ impl<I, O> DualChannel<I, O> where I: Send, O: Send {
         self.recv.recv().expect("could not receive from channel")
     }
 
+    pub fn send(&self, input: I) {
+        self.sender.send(input).expect("could not send");
+    }
+
+    pub fn recv(&self) -> O {
+        self.recv.recv().expect("could not listen on Channel")
+    }
+}
+
+
+pub struct RequestDispatcher {
+    workers: Vec<JoinHandle<()>>,
+}
+
+impl RequestDispatcher {
+
+    pub fn new() -> Self {
+        RequestDispatcher{ workers: Vec::new() }
+    }
+
+    pub fn register(&mut self) -> DualChannel<HttpRequest,HttpResponse> {
+        //TODO StandardRequestProcessor factory
+        let mut request_processor = StandardRequestProcessor {
+            middlewares: vec![],
+            controller: vec![]
+        };
+        let (channel1,channel2) = DualChannel::new();
+        let handle = Builder::new()
+            .name(format!("Http-Worker-{}",self.workers.len() + 1 ))
+            .spawn(move || {
+                loop {
+                    let req = channel1.recv();
+                    println!("Processing Request {:#?}",req); //TODO remove
+                    let response = request_processor.process(req);
+                    channel1.send(response);
+                }
+            }).expect("could not spawn worker thread");
+        self.workers.push(handle);
+        channel2
+    }
 }
 

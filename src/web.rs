@@ -134,6 +134,12 @@ pub struct StandardRequestProcessor {
     controller: Vec<Box<dyn HttpController>>,
 }
 
+impl StandardRequestProcessor {
+    pub fn new(middlewares: Vec<Box<dyn Middleware>>, controller: Vec<Box<dyn HttpController>>) -> Self {
+        StandardRequestProcessor{ middlewares, controller }
+    }
+}
+
 impl RequestProcessor for StandardRequestProcessor {
 
     fn process(&mut self, req: HttpRequest) -> HttpResponse {

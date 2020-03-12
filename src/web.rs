@@ -33,6 +33,7 @@ pub enum HttpMethod {
     Post,
     Delete,
     Put,
+    Unsupported,
 }
 
 #[derive(Debug,Clone)]
@@ -162,6 +163,7 @@ impl RequestProcessor for StandardRequestProcessor {
                 HttpMethod::Post => c.on_post(&req),
                 HttpMethod::Delete => c.on_delete(&req),
                 HttpMethod::Put => c.on_put(&req),
+                HttpMethod::Unsupported => HttpResponse::not_found(),
             },
         }
     }

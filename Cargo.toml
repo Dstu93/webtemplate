@@ -10,5 +10,6 @@ edition = "2018"
 serde = "1.0.104"
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 hyper = "0.13.*"
+url = "*"
 tokio = { version = "0.2", features = ["full"] }
 crossbeam-channel = "0.4.2"

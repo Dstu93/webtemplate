@@ -4,6 +4,7 @@ use crate::web::{StandardRequestProcessor, HttpController, WebServer, RequestDis
 mod web;
 mod web_backend;
 mod example;
+mod factory;
 
 
 use std::cell::Cell;

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use crossbeam_channel::{Sender, Receiver};
 use std::thread::Builder;
 use std::thread::JoinHandle;
+use crate::factory::create_request_proc;
 
 #[derive(Debug,Clone)]
 pub struct HttpRequest {
@@ -237,25 +238,22 @@ impl RequestDispatcher {
         RequestDispatcher{ workers: Vec::new() }
     }
 
+    /// Registers new Thread for Request Processing. Returns a Bidirectional for sending requests and
+    /// receive the response.
     pub fn register(&mut self) -> BidirectionalChannel<HttpRequest,HttpResponse> {
-        //TODO StandardRequestProcessor factory
-        let mut request_processor = StandardRequestProcessor {
-            middlewares: vec![],
-            controller: vec![]
-        };
-        let (channel1,channel2) = BidirectionalChannel::new();
+        let mut request_processor = create_request_proc();
+        let (req_recv, response_recv) = BidirectionalChannel::new();
         let handle = Builder::new()
             .name(format!("Http-Worker-{}",self.workers.len() + 1 ))
             .spawn(move || {
                 loop {
-                    let req = channel1.recv();
-                    println!("Processing Request {:#?}",req); //TODO remove
+                    let req = req_recv.recv();
                     let response = request_processor.process(req);
-                    channel1.send(response);
+                    req_recv.send(response);
                 }
             }).expect("could not spawn worker thread");
         self.workers.push(handle);
-        channel2
+        response_recv
     }
 }
 

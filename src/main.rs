@@ -1,5 +1,5 @@
 use crate::example::CountController;
-use crate::web::{StandardRequestProcessor, HttpController, WebServer};
+use crate::web::{StandardRequestProcessor, HttpController, WebServer, RequestDispatcher};
 
 mod web;
 mod web_backend;
@@ -32,24 +32,16 @@ async fn run() {
 
     let (sender,recv) = channel::<String>();
     // Using a !Send request counter is fine on 1 thread...
-    let counter = Rc::new(Cell::new(0));
-    let (sender,recv) = crossbeam_channel::unbounded();
-    let (rsp_sender,rsp_recv) = crossbeam_channel::unbounded::<Response<Body>>();
-
+    let mut dispatcher = RequestDispatcher::new();
     let make_service = make_service_fn(move |_| {
         // For each connection, clone the counter to use in our service...
-        let cnt = counter.clone();
-        let sender = sender.clone();
-        let response_recv = rsp_recv.clone();
+        let req_channel = dispatcher.register();
         async move {
+            let req_channel = req_channel.clone();
             Ok::<_, Error>(service_fn(move |req: Request<Body>| {
-                let prev = cnt.get();
-                cnt.set(prev + 1);
-                let value = cnt.get();
-                let req = sender.send(req);
-                let response_recv = response_recv.clone();
+                let chnl = req_channel.clone();
                 async move {
-                    Ok::<_, Error>(response_recv.recv().expect("http response recv crashed"))
+                    Ok::<_, Error>(chnl.send_n_receive(req.into()).await.into())
                 }
             }))
         }
